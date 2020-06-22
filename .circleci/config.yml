@@ -22,8 +22,9 @@ jobs:
       - persist_to_workspace:
           paths: .
           root: .
+
 orbs:
-  rn: react-native-community/react-native@1.0.0
+  rn: react-native-community/react-native@4.4.2
 version: 2.1
 workflows:
   test:
