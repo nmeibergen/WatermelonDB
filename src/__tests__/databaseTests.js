@@ -1,7 +1,6 @@
 // @flow
 
-// $FlowFixMe
-import naughtyStrings from 'big-list-of-naughty-strings'
+import naughtyStrings from './utils/naughtyStrings'
 import * as QueryBuilders from '../QueryDescription'
 
 const Q = (QueryBuilders: any)
@@ -19,6 +18,7 @@ function matchTest(
     skipLoki?: boolean,
     skipSqlite?: boolean,
     skipMatcher?: boolean,
+    checkOrder?: boolean,
   }>,
 ): void {
   matchTests.push(options)
@@ -825,16 +825,87 @@ matchTest({
   skipMatcher: true,
 })
 matchTest({
-  name: 'matches with sortBy & take',
-  query: [
-    Q.experimentalSortBy('text1', 'asc'),
-    Q.experimentalSortBy('num1', 'desc'),
-    Q.experimentalTake(2),
-  ],
+  name: 'sorts results by string',
+  query: [Q.sortBy('text1', Q.asc)],
   matching: [
-    // TODO: null handling?
-    { id: 'n2', text1: 'a', num1: 1 },
+    { id: 'n0', text1: null },
+    { id: 'n1', text1: 'a' },
+    { id: 'n2', text1: 'b' },
+    { id: 'n3', text1: 'c' },
+    { id: 'n4', text1: 'd' },
+    { id: 'n5', text1: 'e' },
+    { id: 'n6', text1: 'z' },
+  ],
+  nonMatching: [],
+  skipMatcher: true,
+  checkOrder: true,
+})
+matchTest({
+  name: 'sorts results by string, descending',
+  query: [Q.sortBy('text1', Q.desc)],
+  matching: [
+    { id: 'n6', text1: 'z' },
+    { id: 'n5', text1: 'e' },
+    { id: 'n4', text1: 'd' },
+    { id: 'n3', text1: 'c' },
+    { id: 'n2', text1: 'b' },
+    { id: 'n1', text1: 'a' },
+    { id: 'n0', text1: null },
+  ],
+  nonMatching: [],
+  skipMatcher: true,
+  checkOrder: true,
+})
+matchTest({
+  name: 'sorts results by number',
+  query: [Q.sortBy('num1', Q.asc)],
+  matching: [
+    { id: 'n0', num1: null },
+    { id: 'n1', num1: -100000 },
+    { id: 'n2', num1: -1 },
+    { id: 'n3', num1: 0 },
+    { id: 'n4', num1: 0.1 },
+    { id: 'n5', num1: 5 },
+    { id: 'n6', num1: 1000000 },
+  ],
+  nonMatching: [],
+  skipMatcher: true,
+  checkOrder: true,
+})
+matchTest({
+  name: 'sorts results by boolean',
+  query: [Q.sortBy('bool1', Q.desc)],
+  matching: [
+    { id: 'n0', bool1: true },
+    { id: 'n1', bool1: false },
+    { id: 'n2', bool1: null },
+  ],
+  nonMatching: [],
+  skipMatcher: true,
+  checkOrder: true,
+})
+matchTest({
+  name: 'sorts results by multiple columns',
+  query: [Q.sortBy('text1', Q.asc), Q.sortBy('num1', Q.desc)],
+  matching: [
+    { id: 'n0', text1: null, num1: 100 },
+    { id: 'n1', text1: null, num1: 0 },
+    { id: 'n2', text1: 'aa', num1: 250 },
+    { id: 'n3', text1: 'ab', num1: 300 },
+    { id: 'n4', text1: 'ba', num1: 3.14 },
+    { id: 'n5', text1: 'za', num1: 1.1 },
+    { id: 'n6', text1: 'za', num1: -0 },
+  ],
+  nonMatching: [],
+  skipMatcher: true,
+  checkOrder: true,
+})
+matchTest({
+  name: 'matches with sortBy & take',
+  query: [Q.sortBy('text1', Q.asc), Q.sortBy('num1', Q.desc), Q.take(2)],
+  matching: [
     { id: 'n1', text1: 'a', num1: 2 },
+    { id: 'n2', text1: 'a', num1: 1 },
   ],
   nonMatching: [
     { id: 'n3', text1: 'c', num1: 4 },
@@ -842,22 +913,16 @@ matchTest({
     { id: 'm1', text1: 'b', num1: 10 },
     { id: 'n4', text1: 'c', num1: 3 },
   ],
-  skipLoki: true,
   skipCount: true, // count is broken
   skipMatcher: true,
+  checkOrder: true,
 })
 matchTest({
   name: 'matches with sortBy, take & skip',
-  query: [
-    Q.experimentalSortBy('text1', 'asc'),
-    Q.experimentalSortBy('num1', 'desc'),
-    Q.experimentalSkip(2),
-    Q.experimentalTake(2),
-  ],
+  query: [Q.sortBy('text1', Q.asc), Q.sortBy('num1', Q.desc), Q.skip(2), Q.take(2)],
   matching: [
-    // TODO: null handling?
-    { id: 'm2', text1: 'b', num1: 2 },
     { id: 'm1', text1: 'b', num1: 10 },
+    { id: 'm2', text1: 'b', num1: 2 },
   ],
   nonMatching: [
     { id: 'n3', text1: 'c', num1: 4 },
@@ -865,11 +930,10 @@ matchTest({
     { id: 'n1', text1: 'a', num1: 2 },
     { id: 'n2', text1: 'a', num1: 1 },
   ],
-  skipLoki: true,
   skipCount: true, // count is broken
   skipMatcher: true,
+  checkOrder: true,
 })
-// TODO: Order, not match tests for sortBy, take, skip
 
 export const naughtyMatchTests: any[] = naughtyStrings.map((naughtyString) => ({
   name: naughtyString,
@@ -1203,7 +1267,6 @@ joinTest({
       { id: 'p4', num1: 5, num2: undefined },
       { id: 'p5', num1: 0 },
       { id: 'p6', num1: 0, num2: null },
-
       { id: 'badp1' },
       { id: 'badp2', num1: null },
       { id: 'badp3', num2: null },
@@ -1402,4 +1465,53 @@ joinTest({
   skipSqlite: true,
 })
 
-export { matchTests, joinTests }
+const ftsMatchTests = [
+  {
+    name: 'Can ftsMatch - text1',
+    query: [Q.where('text1', Q.ftsMatch('bar'))],
+    matching: [
+      { id: 'fts_foo_bar', text1: 'foo bar' },
+      { id: 'fts_bar', text1: 'bar' },
+      { id: 'fts_bar_baz', text1: 'bar baz' },
+    ],
+    nonMatching: [
+      { id: 'fts_foo', text1: 'foo', text2: 'bar baz' },
+      { id: 'fts_foo_baz', text1: 'foo baz', text2: 'bar' },
+      { id: 'fts_baz', text1: 'baz', text2: 'foo bar' },
+      { id: 'fts_foo_bar_baz', text1: 'foo bar baz', _status: 'deleted' },
+    ],
+    skipLoki: true,
+  },
+  {
+    name: 'Can ftsMatch - text2',
+    query: [Q.where('text2', Q.ftsMatch('bar'))],
+    matching: [
+      { id: 'fts_foo', text1: 'foo', text2: 'bar baz' },
+      { id: 'fts_foo_baz', text1: 'foo baz', text2: 'bar' },
+      { id: 'fts_baz', text1: 'baz', text2: 'foo bar' },
+    ],
+    nonMatching: [
+      { id: 'fts_foo_bar', text1: 'foo bar' },
+      { id: 'fts_bar', text1: 'bar' },
+      { id: 'fts_bar_baz', text1: 'bar baz' },
+      { id: 'fts_foo_bar_baz', text1: 'foo bar baz', _status: 'deleted' },
+    ],
+    skipLoki: true,
+  },
+  {
+    name: 'Can ftsMatch - text1 and text2',
+    query: [Q.where('tasks', Q.ftsMatch('bar'))],
+    matching: [
+      { id: 'fts_foo_bar', text1: 'foo bar' },
+      { id: 'fts_bar', text1: 'bar' },
+      { id: 'fts_bar_baz', text1: 'bar baz' },
+      { id: 'fts_foo', text1: 'foo', text2: 'bar baz' },
+      { id: 'fts_foo_baz', text1: 'foo baz', text2: 'bar' },
+      { id: 'fts_baz', text1: 'baz', text2: 'foo bar' },
+    ],
+    nonMatching: [{ id: 'fts_foo_bar_baz', text1: 'foo bar baz', _status: 'deleted' }],
+    skipLoki: true,
+  },
+]
+
+export { matchTests, joinTests, ftsMatchTests }

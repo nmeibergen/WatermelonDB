@@ -1,4 +1,4 @@
-import { sortBy, identity, pipe, pluck } from 'rambdax'
+import { sortBy, identity, pipe, pluck, shuffle } from 'rambdax'
 import expect from 'expect-rn'
 import { allPromises, toPairs } from '../../utils/fp'
 
@@ -43,6 +43,9 @@ export class MockTagAssignment extends Model {
     tasks: { type: 'belongs_to', key: 'task_id' },
   }
 }
+export class MockSyncTestRecord extends Model {
+  static table = 'sync_tests'
+}
 
 export const testSchema = appSchema({
   version: 1,
@@ -56,8 +59,8 @@ export const testSchema = appSchema({
         { name: 'num3', type: 'number' },
         { name: 'float1', type: 'number' }, // TODO: Remove me?
         { name: 'float2', type: 'number' },
-        { name: 'text1', type: 'string' },
-        { name: 'text2', type: 'string' },
+        { name: 'text1', type: 'string', isFTS: true },
+        { name: 'text2', type: 'string', isFTS: true },
         { name: 'bool1', type: 'boolean' },
         { name: 'bool2', type: 'boolean' },
         { name: 'order', type: 'number' },
@@ -109,6 +112,17 @@ export const testSchema = appSchema({
     tableSchema({ name: 'set', columns: [] }),
     tableSchema({ name: 'drop', columns: [] }),
     tableSchema({ name: 'update', columns: [] }),
+    tableSchema({
+      name: 'sync_tests',
+      columns: [
+        { name: 'str', type: 'string' },
+        { name: 'strN', type: 'string', isOptional: true },
+        { name: 'num', type: 'number' },
+        { name: 'numN', type: 'number', isOptional: true },
+        { name: 'bool', type: 'boolean' },
+        { name: 'boolN', type: 'boolean', isOptional: true },
+      ],
+    }),
   ],
 })
 
@@ -117,6 +131,7 @@ const mockCollections = {
   projects: MockProject,
   teams: MockTeam,
   tag_assignments: MockTagAssignment,
+  sync_tests: MockSyncTestRecord,
 }
 
 export const modelQuery = (modelClass, ...conditions) => {
@@ -154,8 +169,9 @@ export const expectSortedEqual = (actual, expected) => {
 export const performMatchTest = async (adapter, testCase) => {
   const { matching, nonMatching, query: conditions } = testCase
 
-  await insertAll(adapter, 'tasks', matching)
-  await insertAll(adapter, 'tasks', nonMatching)
+  // NOTE: shuffle so that order test does not depend on insertion order
+  await insertAll(adapter, 'tasks', shuffle(matching))
+  await insertAll(adapter, 'tasks', shuffle(nonMatching))
 
   const query = taskQuery(...conditions)
 
@@ -164,6 +180,10 @@ export const performMatchTest = async (adapter, testCase) => {
     const results = await adapter.query(query)
     const expectedResults = getExpectedResults(matching)
     expect(sort(results)).toEqual(expectedResults)
+
+    if (testCase.checkOrder) {
+      expect(results).toEqual(pluck('id', matching))
+    }
 
     // test if ID fetch is correct
     const ids = await adapter.queryIds(query)
@@ -183,6 +203,12 @@ export const performMatchTest = async (adapter, testCase) => {
 }
 
 export const performJoinTest = async (adapter, testCase) => {
+  const pairs = toPairs(testCase.extraRecords)
+  await allPromises(([table, records]) => insertAll(adapter, table, records), pairs)
+  await performMatchTest(adapter, testCase)
+}
+
+export const performFtsMatchTest = async (adapter, testCase) => {
   const pairs = toPairs(testCase.extraRecords)
   await allPromises(([table, records]) => insertAll(adapter, table, records), pairs)
   await performMatchTest(adapter, testCase)

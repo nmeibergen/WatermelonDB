@@ -63,6 +63,16 @@ export default class DatabaseAdapterCompat {
     )
   }
 
+  unsafeLoadFromSync(jsonId: number): Promise<any> {
+    return toPromise((callback) => this.underlyingAdapter.unsafeLoadFromSync(jsonId, callback))
+  }
+
+  provideSyncJson(id: number, syncPullResultJson: string): Promise<void> {
+    return toPromise((callback) =>
+      this.underlyingAdapter.provideSyncJson(id, syncPullResultJson, callback),
+    )
+  }
+
   unsafeResetDatabase(): Promise<void> {
     return toPromise((callback) => this.underlyingAdapter.unsafeResetDatabase(callback))
   }

@@ -56,6 +56,12 @@ export interface DatabaseAdapter {
     callback: ResultCallback<void>,
   ): void;
 
+  // Unsafely adds records from a serialized (json) SyncPullResult provided earlier via native API
+  unsafeLoadFromSync(jsonId: number, callback: ResultCallback<any>): void;
+
+  // Provides JSON for use by unsafeLoadFromSync
+  provideSyncJson(id: number, syncPullResultJson: string, callback: ResultCallback<void>): void;
+
   // Destroys the whole database, its schema, indexes, everything.
   unsafeResetDatabase(callback: ResultCallback<void>): void;
 

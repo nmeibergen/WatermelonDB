@@ -1,5 +1,8 @@
 import expect from 'expect-rn'
-import naughtyStrings from 'big-list-of-naughty-strings'
+import naughtyStrings, {
+  bigEndianByteOrderMark,
+  littleEndianByteOrderMark,
+} from '../../__tests__/utils/naughtyStrings'
 
 import expectToRejectWithMessage from '../../__tests__/utils/expectToRejectWithMessage'
 import Model from '../../Model'
@@ -9,7 +12,12 @@ import * as Q from '../../QueryDescription'
 import { appSchema, tableSchema } from '../../Schema'
 import { schemaMigrations, createTable, addColumns } from '../../Schema/migrations'
 
-import { matchTests, naughtyMatchTests, joinTests } from '../../__tests__/databaseTests'
+import {
+  matchTests,
+  naughtyMatchTests,
+  joinTests,
+  ftsMatchTests,
+} from '../../__tests__/databaseTests'
 import DatabaseAdapterCompat from '../compat'
 import {
   testSchema,
@@ -17,8 +25,10 @@ import {
   mockTaskRaw,
   performMatchTest,
   performJoinTest,
+  performFtsMatchTest,
   expectSortedEqual,
   MockTask,
+  MockSyncTestRecord,
   mockProjectRaw,
   mockTagAssignmentRaw,
   projectQuery,
@@ -566,6 +576,163 @@ export default () => {
     expect(await adapter.getDeletedRecords('tasks')).toHaveLength(0)
     expect(await queryAll()).toHaveLength(1)
   })
+  it(`can unsafely load from sync JSON`, async (adapter, AdapterClass) => {
+    if (
+      !(
+        AdapterClass.name === 'SQLiteAdapter' && adapter.underlyingAdapter._dispatcherType === 'jsi'
+      )
+    ) {
+      await expectToRejectWithMessage(
+        adapter.unsafeLoadFromSync(0),
+        'unsafeLoadFromSync unavailable',
+      )
+      return
+    }
+
+    const loadFromSync = async (json) => {
+      const id = Math.round(Math.random() * 1000 * 1000 * 1000)
+      await adapter.provideSyncJson(id, JSON.stringify(json))
+      return adapter.unsafeLoadFromSync(id)
+    }
+
+    await loadFromSync({ changes: {} })
+    expect(
+      await loadFromSync({
+        changes: { sync_tests: { created: [], updated: [], deleted: [] } },
+        timestamp: 1000,
+      }),
+    ).toEqual({ timestamp: 1000 })
+
+    const query = modelQuery(MockSyncTestRecord).serialize()
+    expect(await adapter.unsafeQueryRaw(query)).toHaveLength(0)
+
+    const { expectedSanitizations } = require('../../RawRecord/__tests__/helpers')
+    await loadFromSync({
+      changes: {
+        sync_tests: {
+          updated: [
+            { id: 't1' },
+            {
+              id: 't2',
+              str: 'ab',
+              _changed: 'abc',
+              _status: 'updated',
+              this_column_does_not_exist: 'blaaagh',
+            },
+            { id: 't3', str: 'hy', strN: 'true', num: 3.141592137, bool: null, boolN: false },
+            { id: 't4', num: 1623666158603 },
+          ],
+          created: expectedSanitizations.map(({ value }, i) => ({
+            // NOTE: Intentionally in wrong order
+            num: value,
+            str: value,
+            boolN: value,
+            id: `x${i}`,
+            strN: value,
+            numN: value,
+            bool: value,
+          })),
+        },
+        tasks: {
+          created: [{ id: 't1', text1: 'hello' }],
+        },
+        this_table_does_not_exist: {
+          created: [],
+        },
+      },
+    })
+    const d = { _status: 'synced', _changed: '' }
+    const sqlBool = (value) => {
+      if (value === true) {
+        return 1
+      } else if (value === false) {
+        return 0
+      }
+      return value
+    }
+    expect(await adapter.unsafeQueryRaw(query)).toEqual([
+      { id: 't1', ...d, str: '', strN: null, num: 0, numN: null, bool: 0, boolN: null },
+      { id: 't2', ...d, str: 'ab', strN: null, num: 0, numN: null, bool: 0, boolN: null },
+      { id: 't3', ...d, str: 'hy', strN: 'true', num: 3.141592137, numN: null, bool: 0, boolN: 0 },
+      { id: 't4', ...d, str: '', strN: null, num: 1623666158603, numN: null, bool: 0, boolN: null },
+      ...expectedSanitizations.map((values, i) => ({
+        id: `x${i}`,
+        _status: 'synced',
+        _changed: '',
+        str: values.string[0],
+        strN: values.string[1],
+        num: values.number[0],
+        numN: values.number[1],
+        bool: sqlBool(values.boolean[0]),
+        boolN: sqlBool(values.boolean[1]),
+      })),
+    ])
+    expect(await adapter.query(taskQuery())).toEqual([
+      mockTaskRaw({ id: 't1', text1: 'hello', _status: 'synced' }),
+    ])
+    await expectToRejectWithMessage(
+      loadFromSync({ changes: { tasks: { deleted: ['t1', 't2'] } } }),
+      'expected deleted field to be empty',
+    )
+    await expectToRejectWithMessage(
+      loadFromSync({ changes: { tasks: { wat: [] } } }),
+      'bad changeset field',
+    )
+  })
+  it(`can return residual JSON from sync JSON`, async (adapter, AdapterClass) => {
+    if (
+      !(
+        AdapterClass.name === 'SQLiteAdapter' && adapter.underlyingAdapter._dispatcherType === 'jsi'
+      )
+    ) {
+      await expectToRejectWithMessage(
+        adapter.unsafeLoadFromSync(0),
+        'unsafeLoadFromSync unavailable',
+      )
+      return
+    }
+
+    const check = async (obj) => {
+      const id = Math.round(Math.random() * 1000 * 1000 * 1000)
+      await adapter.provideSyncJson(id, JSON.stringify({ changes: {}, ...obj }))
+      const result = await adapter.unsafeLoadFromSync(id)
+      expect(result).toEqual({ ...obj })
+    }
+
+    await check({})
+    await check({ foo: 'bar', num: 0, num1: 1, float: 3.14, nul: null, yes: true, no: false })
+    await check({ timestamp: 1623666158603 })
+    await check({ messages: ['foo', 'bar', 'baz'] })
+    await check({ foo: { bar: [1, 2, 3], baz: 'blah' } })
+    await check({ naughty: 'foo{\nbar\0' })
+    await check({ _naughty: { '_naughty\n{\0': 'yes' } })
+  })
+  it(`destroys provided jsons after being used`, async (adapter, AdapterClass) => {
+    if (
+      !(
+        AdapterClass.name === 'SQLiteAdapter' && adapter.underlyingAdapter._dispatcherType === 'jsi'
+      )
+    ) {
+      await expectToRejectWithMessage(
+        adapter.provideSyncJson(0, '{}'),
+        'provideSyncJson unavailable',
+      )
+      return
+    }
+
+    await adapter.provideSyncJson(
+      2137,
+      JSON.stringify({ changes: { tasks: { created: [{ id: 't1' }] } } }),
+    )
+
+    await adapter.unsafeLoadFromSync(2137)
+    expect(await adapter.unsafeQueryRaw(taskQuery())).toHaveLength(1)
+
+    await expectToRejectWithMessage(
+      adapter.unsafeLoadFromSync(2137),
+      'Sync json 2137 does not exist',
+    )
+  })
   it('can unsafely reset database', async (adapter) => {
     await adapter.batch([['create', 'tasks', mockTaskRaw({ id: 't1', text1: 'bar', order: 1 })]])
     await adapter.unsafeResetDatabase()
@@ -702,8 +869,8 @@ export default () => {
       if (
         AdapterClass.name === 'SQLiteAdapter' &&
         !extraAdapterOptions.jsi &&
-        (key === '﻿' || (key === '￾' && platform === 'android')) &&
-        platform !== 'node'
+        ((key === bigEndianByteOrderMark && ['android', 'ios'].includes(platform)) ||
+          (key === littleEndianByteOrderMark && platform === 'android'))
       ) {
         // eslint-disable-next-line no-await-in-loop
         await adapter.setLocal(key, key)
@@ -768,8 +935,7 @@ export default () => {
         ...extraAdapterOptions,
       }),
     )
-    // TODO: Remove me. Temporary workaround for the race condition - wait until next macrotask to ensure that database has set up
-    await new Promise((resolve) => setTimeout(resolve, 0))
+
     // add data
     await adapter.batch([
       ['create', 'tasks', { id: 't1', num1: 10 }],
@@ -891,8 +1057,7 @@ export default () => {
         ...extraAdapterOptions,
       }),
     )
-    // TODO: Remove me. Temporary workaround for the race condition - wait until next macrotask to ensure that database has set up
-    await new Promise((resolve) => setTimeout(resolve, 0))
+
     await adapter.batch([['create', 'tasks', mockTaskRaw({ id: 't1', text1: 'foo' })]])
     expect(await adapter.count(taskQuery())).toBe(1)
 
@@ -915,8 +1080,6 @@ export default () => {
         ...extraAdapterOptions,
       }),
     )
-    // TODO: Remove me. Temporary workaround for the race condition - wait until next macrotask to ensure that database has set up
-    await new Promise((resolve) => setTimeout(resolve, 0))
 
     await adapter.batch([['create', 'tasks', mockTaskRaw({})]])
     expect(await adapter.count(taskQuery())).toBe(1)
@@ -940,8 +1103,6 @@ export default () => {
         ...extraAdapterOptions,
       }),
     )
-    // TODO: Remove me. Temporary workaround for the race condition - wait until next macrotask to ensure that database has set up
-    await new Promise((resolve) => setTimeout(resolve, 0))
 
     await adapter.batch([['create', 'tasks', mockTaskRaw({})]])
     expect(await adapter.count(taskQuery())).toBe(1)
@@ -965,8 +1126,6 @@ export default () => {
         ...extraAdapterOptions,
       }),
     )
-    // TODO: Remove me. Temporary workaround for the race condition - wait until next macrotask to ensure that database has set up
-    await new Promise((resolve) => setTimeout(resolve, 0))
 
     await adapter.batch([['create', 'tasks', mockTaskRaw({})]])
     expect(await adapter.count(taskQuery())).toBe(1)
@@ -1014,8 +1173,6 @@ export default () => {
         ...extraAdapterOptions,
       }),
     )
-    // TODO: Remove me. Temporary workaround for the race condition - wait until next macrotask to ensure that database has set up
-    await new Promise((resolve) => setTimeout(resolve, 0))
 
     // sanity check
     expect(await adapter.count(taskQuery())).toBe(0)
@@ -1030,8 +1187,7 @@ export default () => {
         ...extraAdapterOptions,
       }),
     )
-    // TODO: Remove me. Temporary workaround for the race condition - wait until next macrotask to ensure that database has set up
-    await new Promise((resolve) => setTimeout(resolve, 0))
+
     expect(await adapter2.count(taskQuery())).toBe(1)
 
     // reset
@@ -1046,8 +1202,6 @@ export default () => {
         ...extraAdapterOptions,
       }),
     )
-    // TODO: Remove me. Temporary workaround for the race condition - wait until next macrotask to ensure that database has set up
-    await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(await adapter3.count(taskQuery())).toBe(0)
   })
@@ -1087,7 +1241,8 @@ export default () => {
       if (
         AdapterClass.name === 'SQLiteAdapter' &&
         !extraAdapterOptions.jsi &&
-        (naughtyString === '﻿' || (naughtyString === '￾' && platform === 'android'))
+        ((naughtyString === bigEndianByteOrderMark && ['android', 'ios'].includes(platform)) ||
+          (naughtyString === littleEndianByteOrderMark && platform === 'android'))
       ) {
         // eslint-disable-next-line no-console
         console.warn('skip check for a BOM naughty string - known failing test')
@@ -1096,7 +1251,21 @@ export default () => {
         await performMatchTest(adapter, testCase)
       }
     }
-  })
+  }),
+  ftsMatchTests.forEach((testCase) => [
+    `[shared ftsMatch test] ${testCase.name}`,
+    async (adapter, AdapterClass) => {
+      const perform = () => performFtsMatchTest(adapter, testCase)
+      const shouldSkip =
+        (AdapterClass.name === 'LokiJSAdapter' && testCase.skipLoki) ||
+        (AdapterClass.name === 'SQLiteAdapter' && testCase.skipSqlite)
+      if (shouldSkip) {
+        await expect(perform()).rejects.toBeInstanceOf(Error)
+      } else {
+        await perform()
+      }
+    },
+  ]),
   it('can store and retrieve large numbers (regression test)', async (_adapter) => {
     // NOTE: matcher test didn't catch it because both insert and query has the same bug
     let adapter = _adapter
@@ -1125,8 +1294,8 @@ export default () => {
       if (
         AdapterClass.name === 'SQLiteAdapter' &&
         !extraAdapterOptions.jsi &&
-        (string === '﻿' || (string === '￾' && platform === 'android')) &&
-        platform !== 'node'
+        ((string === bigEndianByteOrderMark && ['android', 'ios'].includes(platform)) ||
+          (string === littleEndianByteOrderMark && platform === 'android'))
       ) {
         expect(record.text1).not.toBe(string) // if this fails, it means the issue's been fixed
       } else {

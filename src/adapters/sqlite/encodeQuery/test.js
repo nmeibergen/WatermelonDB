@@ -71,7 +71,7 @@ describe('SQLite encodeQuery', () => {
         Q.where('col5', Q.lte(5)),
         Q.where('col6', Q.notEq(null)),
         Q.where('col7', Q.oneOf([1, 2, 3])),
-        Q.where('col8', Q.notIn(['"a"', "'b'", 'c'])),
+        Q.where('col8', Q.notIn(['"a"', "'b'", 'c'])), // eslint-disable-line quotes
         Q.where('col9', Q.between(10, 11)),
         Q.where('col10', Q.like('%abc')),
         Q.where('col11', Q.notLike('def%')),
@@ -171,6 +171,57 @@ describe('SQLite encodeQuery', () => {
         ` and "tasks"."_status" is not 'deleted'`,
     )
   })
+  it('encodes ftsMatch', () => {
+    expect(encoded([Q.where('searchable', Q.ftsMatch('hello world'))])).toBe(
+      `select "tasks".* from "tasks" ` +
+        `where "tasks"."rowid" in (` +
+        `select "_fts_tasks"."rowid" from "_fts_tasks" ` +
+        `where "_fts_tasks"."searchable" match 'hello world'` +
+        `) and "tasks"."_status" is not 'deleted'`,
+    )
+    expect(encoded([Q.where('tasks', Q.ftsMatch('hello world'))])).toBe(
+      `select "tasks".* from "tasks" ` +
+        `where "tasks"."rowid" in (` +
+        `select "_fts_tasks"."rowid" from "_fts_tasks" ` +
+        `where "_fts_tasks" match 'hello world'` +
+        `) and "tasks"."_status" is not 'deleted'`,
+    )
+  })
+  it('encodes ftsMatch with other joins', () => {
+    const query = [
+      Q.on('projects', 'team_id', 'abcdef'),
+      Q.on('projects', 'is_active', true),
+      Q.on('projects', 'left_column', Q.lte(Q.column('right_column'))),
+      Q.on('projects', 'left2', Q.weakGt(Q.column('right2'))),
+      Q.where('left_column', 'right_value'),
+      Q.on('tag_assignments', 'tag_id', Q.oneOf(['a', 'b', 'c'])),
+      Q.where('searchable', Q.ftsMatch('hello world')),
+    ]
+    const expectedQuery =
+      `join "projects" on "projects"."id" = "tasks"."project_id"` +
+      ` join "tag_assignments" on "tag_assignments"."task_id" = "tasks"."id"` +
+      ` where ("projects"."team_id" is 'abcdef'` +
+      ` and "projects"."_status" is not 'deleted')` +
+      ` and ("projects"."is_active" is 1` +
+      ` and "projects"."_status" is not 'deleted')` +
+      ` and ("projects"."left_column" <= "projects"."right_column"` +
+      ` and "projects"."_status" is not 'deleted')` +
+      ` and (("projects"."left2" > "projects"."right2"` +
+      ` or ("projects"."left2" is not null` +
+      ` and "projects"."right2" is null))` +
+      ` and "projects"."_status" is not 'deleted')` +
+      ` and "tasks"."left_column" is 'right_value'` +
+      ` and ("tag_assignments"."tag_id" in ('a', 'b', 'c')` +
+      ` and "tag_assignments"."_status" is not 'deleted')` +
+      ` and "tasks"."rowid" in` +
+      ` (select "_fts_tasks"."rowid" from "_fts_tasks" where` +
+      ` "_fts_tasks"."searchable" match 'hello world')` +
+      ` and "tasks"."_status" is not 'deleted'`
+    expect(encoded(query)).toBe(`select distinct "tasks".* from "tasks" ${expectedQuery}`)
+    expect(encoded(query, true)).toBe(
+      `select count(distinct "tasks"."id") as "count" from "tasks" ${expectedQuery}`,
+    )
+  })
   it(`encodes on nested in and/or`, () => {
     expect(
       encoded([
@@ -239,38 +290,29 @@ describe('SQLite encodeQuery', () => {
     )
   })
   it('encodes order by clause', () => {
-    expect(encoded([Q.experimentalSortBy('sortable_column', Q.desc)])).toBe(
+    expect(encoded([Q.sortBy('sortable_column', Q.desc)])).toBe(
       `select "tasks".* from "tasks" where "tasks"."_status" is not 'deleted' order by "tasks"."sortable_column" desc`,
     )
   })
   it('encodes multiple order by clauses', () => {
     expect(
-      encoded([
-        Q.experimentalSortBy('sortable_column', Q.desc),
-        Q.experimentalSortBy('sortable_column2', Q.asc),
-      ]),
+      encoded([Q.sortBy('sortable_column', Q.desc), Q.sortBy('sortable_column2', Q.asc)]),
     ).toBe(
       `select "tasks".* from "tasks" where "tasks"."_status" is not 'deleted' order by "tasks"."sortable_column" desc, "tasks"."sortable_column2" asc`,
     )
   })
   it('encodes limit clause', () => {
-    expect(encoded([Q.experimentalTake(100)])).toBe(
+    expect(encoded([Q.take(100)])).toBe(
       `select "tasks".* from "tasks" where "tasks"."_status" is not 'deleted' limit 100`,
     )
   })
   it('encodes limit with offset clause', () => {
-    expect(encoded([Q.experimentalTake(100), Q.experimentalSkip(200)])).toBe(
+    expect(encoded([Q.take(100), Q.skip(200)])).toBe(
       `select "tasks".* from "tasks" where "tasks"."_status" is not 'deleted' limit 100 offset 200`,
     )
   })
   it('encodes order by together with limit and offset clause', () => {
-    expect(
-      encoded([
-        Q.experimentalSortBy('sortable_column', 'desc'),
-        Q.experimentalTake(100),
-        Q.experimentalSkip(200),
-      ]),
-    ).toBe(
+    expect(encoded([Q.sortBy('sortable_column', 'desc'), Q.take(100), Q.skip(200)])).toBe(
       `select "tasks".* from "tasks" where "tasks"."_status" is not 'deleted' order by "tasks"."sortable_column" desc limit 100 offset 200`,
     )
   })
