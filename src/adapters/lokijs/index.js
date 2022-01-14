@@ -65,6 +65,9 @@ export type LokiAdapterOptions = $Exact<{
     // while IDB does work on a separate thread.
     // Note that this only works when not using web workers
     onFetchStart?: () => void,
+    // Collections (by table name) that Loki should deserialize lazily. This is only profitable for
+    // collections that are most likely not required for launch - making everything lazy makes it slower
+    lazyCollections?: TableName<any>[],
   }>,
   // -- internal --
   _testLokiAdapter?: LokiMemoryAdapter,
@@ -73,9 +76,13 @@ export type LokiAdapterOptions = $Exact<{
 }>
 
 export default class LokiJSAdapter implements DatabaseAdapter {
+  static adapterType: string = 'loki'
+
   _dispatcher: LokiDispatcher
 
   schema: AppSchema
+
+  dbName: string
 
   migrations: ?SchemaMigrations
 
@@ -83,6 +90,7 @@ export default class LokiJSAdapter implements DatabaseAdapter {
 
   constructor(options: LokiAdapterOptions): void {
     this._options = options
+    this.dbName = options.dbName || 'loki'
     const { schema, migrations } = options
 
     const useWebWorker = options.useWebWorker ?? process.env.NODE_ENV !== 'test'

@@ -1,119 +1,156 @@
 // @flow
 /* eslint-disable no-use-before-define */
 
-import { unique } from '../utils/fp'
+import {
+  unique
+} from '../utils/fp'
 
 // don't import whole `utils` to keep worker size small
 import invariant from '../utils/common/invariant'
 import logger from '../utils/common/logger'
 import checkName from '../utils/fp/checkName'
 import deepFreeze from '../utils/common/deepFreeze'
-import type { $RE } from '../types'
+import type {
+  $RE
+} from '../types'
 
-import { type TableName, type ColumnName, columnName } from '../Schema'
+import {
+  type TableName,
+  type ColumnName,
+  columnName
+} from '../Schema'
 
 export type NonNullValue = number | string | boolean
 export type NonNullValues = number[] | string[] | boolean[]
 export type Value = NonNullValue | null
 export type CompoundValue = Value | Value[]
 
-export type Operator =
-  | 'eq'
-  | 'notEq'
-  | 'gt'
-  | 'gte'
-  | 'weakGt'
-  | 'lt'
-  | 'lte'
-  | 'oneOf'
-  | 'notIn'
-  | 'between'
-  | 'like'
-  | 'notLike'
-  | 'ftsMatch'
+export type Operator = |
+  'eq' |
+  'notEq' |
+  'gt' |
+  'gte' |
+  'weakGt' |
+  'lt' |
+  'lte' |
+  'oneOf' |
+  'notIn' |
+  'between' |
+  'like' |
+  'notLike' |
+  'ftsMatch' |
+  'includes'
 
-export type ColumnDescription = $RE<{ column: ColumnName, type?: symbol }>
-export type ComparisonRight =
-  | $RE<{ value: Value }>
-  | $RE<{ values: NonNullValues }>
-  | ColumnDescription
-export type Comparison = $RE<{ operator: Operator, right: ComparisonRight, type?: symbol }>
+export type ColumnDescription = $RE < {
+    column: ColumnName,
+    type ? : symbol
+  } >
+  export type ComparisonRight = |
+  $RE < {
+    value: Value
+  } >
+  |
+  $RE < {
+    values: NonNullValues
+  } >
+  |
+  ColumnDescription
+export type Comparison = $RE < {
+    operator: Operator,
+    right: ComparisonRight,
+    type ? : symbol
+  } >
 
-export type WhereDescription = $RE<{
-  type: 'where',
-  left: ColumnName,
-  comparison: Comparison,
-}>
+  export type WhereDescription = $RE < {
+    type: 'where',
+    left: ColumnName,
+    comparison: Comparison,
+  } >
 
-export type SqlExpr = $RE<{ type: 'sql', expr: string }>
-export type LokiExpr = $RE<{ type: 'loki', expr: any }>
+  export type SqlExpr = $RE < {
+    type: 'sql',
+    expr: string
+  } >
+  export type LokiExpr = $RE < {
+    type: 'loki',
+    expr: any
+  } >
 
-export type Where = WhereDescription | And | Or | On | SqlExpr | LokiExpr
-export type And = $RE<{ type: 'and', conditions: Where[] }>
-export type Or = $RE<{ type: 'or', conditions: Where[] }>
-export type On = $RE<{
-  type: 'on',
-  table: TableName<any>,
-  conditions: Where[],
-}>
-export type SortOrder = 'asc' | 'desc'
+  export type Where = WhereDescription | And | Or | On | SqlExpr | LokiExpr
+export type And = $RE < {
+    type: 'and',
+    conditions: Where[]
+  } >
+  export type Or = $RE < {
+    type: 'or',
+    conditions: Where[]
+  } >
+  export type On = $RE < {
+    type: 'on',
+    table: TableName < any > ,
+    conditions: Where[],
+  } >
+  export type SortOrder = 'asc' | 'desc'
 export const asc: SortOrder = 'asc'
 export const desc: SortOrder = 'desc'
-export type SortBy = $RE<{
-  type: 'sortBy',
-  sortColumn: ColumnName,
-  sortOrder: SortOrder,
-}>
-export type Take = $RE<{
-  type: 'take',
-  count: number,
-}>
-export type Skip = $RE<{
-  type: 'skip',
-  count: number,
-}>
-export type JoinTables = $RE<{
-  type: 'joinTables',
-  tables: TableName<any>[],
-}>
-export type NestedJoinTable = $RE<{
-  type: 'nestedJoinTable',
-  from: TableName<any>,
-  to: TableName<any>,
-}>
-export type LokiTransformFunction = (rawLokiRecords: any[], loki: any) => any[]
-export type LokiTransform = $RE<{
-  type: 'lokiTransform',
-  function: LokiTransformFunction,
-}>
-export type SqlQuery = $RE<{
-  type: 'sqlQuery',
-  sql: string,
-  values: Value[],
-}>
-export type Clause =
-  | Where
-  | SortBy
-  | Take
-  | Skip
-  | JoinTables
-  | NestedJoinTable
-  | LokiTransform
-  | SqlQuery
+export type SortBy = $RE < {
+    type: 'sortBy',
+    sortColumn: ColumnName,
+    sortOrder: SortOrder,
+  } >
+  export type Take = $RE < {
+    type: 'take',
+    count: number,
+  } >
+  export type Skip = $RE < {
+    type: 'skip',
+    count: number,
+  } >
+  export type JoinTables = $RE < {
+    type: 'joinTables',
+    tables: TableName < any > [],
+  } >
+  export type NestedJoinTable = $RE < {
+    type: 'nestedJoinTable',
+    from: TableName < any > ,
+    to: TableName < any > ,
+  } >
+  export type LokiTransformFunction = (rawLokiRecords: any[], loki: any) => any[]
+export type LokiTransform = $RE < {
+    type: 'lokiTransform',
+    function: LokiTransformFunction,
+  } >
+  export type SqlQuery = $RE < {
+    type: 'sqlQuery',
+    sql: string,
+    values: Value[],
+  } >
+  export type Clause = |
+  Where |
+  SortBy |
+  Take |
+  Skip |
+  JoinTables |
+  NestedJoinTable |
+  LokiTransform |
+  SqlQuery
 
-type NestedJoinTableDef = $RE<{ from: TableName<any>, to: TableName<any> }>
-export type QueryDescription = $RE<{
-  where: Where[],
-  joinTables: TableName<any>[],
-  nestedJoinTables: NestedJoinTableDef[],
-  sortBy: SortBy[],
-  take?: number,
-  skip?: number,
-  lokiTransform?: LokiTransformFunction,
-  sql?: SqlQuery,
-}>
+type NestedJoinTableDef = $RE < {
+    from: TableName < any > ,
+    to: TableName < any >
+  } >
+  export type QueryDescription = $RE < {
+    where: Where[],
+    joinTables: TableName < any > [],
+    nestedJoinTables: NestedJoinTableDef[],
+    sortBy: SortBy[],
+    take ? : number,
+    skip ? : number,
+    lokiTransform ? : LokiTransformFunction,
+    sql ? : SqlQuery,
+  } >
 
-const columnSymbol = Symbol('Q.column')
+  const columnSymbol = Symbol('Q.column')
 const comparisonSymbol = Symbol('QueryComparison')
 
 // Note: These operators are designed to match SQLite semantics
@@ -134,7 +171,10 @@ const comparisonSymbol = Symbol('QueryComparison')
 
 function _valueOrColumn(arg: Value | ColumnDescription): ComparisonRight {
   if (arg === null || typeof arg !== 'object') {
-    return { value: arg }
+    invariant(arg !== undefined, 'Cannot compare to undefined in a Query. Did you mean null?')
+    return {
+      value: arg
+    }
   }
 
   if (typeof arg.column === 'string') {
@@ -142,7 +182,9 @@ function _valueOrColumn(arg: Value | ColumnDescription): ComparisonRight {
       arg.type === columnSymbol,
       'Invalid { column: } object passed to Watermelon query. You seem to be passing unsanitized user data to Query builder!',
     )
-    return { column: arg.column }
+    return {
+      column: arg.column
+    }
   }
 
   throw new Error(`Invalid value passed to query`)
@@ -154,7 +196,11 @@ function _valueOrColumn(arg: Value | ColumnDescription): ComparisonRight {
 // - (1 == true) == true
 // - (0 == false) == true
 export function eq(valueOrColumn: Value | ColumnDescription): Comparison {
-  return { operator: 'eq', right: _valueOrColumn(valueOrColumn), type: comparisonSymbol }
+  return {
+    operator: 'eq',
+    right: _valueOrColumn(valueOrColumn),
+    type: comparisonSymbol
+  }
 }
 
 // Not equal (weakly)
@@ -163,42 +209,66 @@ export function eq(valueOrColumn: Value | ColumnDescription): Comparison {
 // - (1 != true) == false
 // - (0 != false) == false
 export function notEq(valueOrColumn: Value | ColumnDescription): Comparison {
-  return { operator: 'notEq', right: _valueOrColumn(valueOrColumn), type: comparisonSymbol }
+  return {
+    operator: 'notEq',
+    right: _valueOrColumn(valueOrColumn),
+    type: comparisonSymbol
+  }
 }
 
 // Greater than (SQLite semantics)
 // Note:
 // - (5 > null) == false
 export function gt(valueOrColumn: NonNullValue | ColumnDescription): Comparison {
-  return { operator: 'gt', right: _valueOrColumn(valueOrColumn), type: comparisonSymbol }
+  return {
+    operator: 'gt',
+    right: _valueOrColumn(valueOrColumn),
+    type: comparisonSymbol
+  }
 }
 
 // Greater than or equal (SQLite semantics)
 // Note:
 // - (5 >= null) == false
 export function gte(valueOrColumn: NonNullValue | ColumnDescription): Comparison {
-  return { operator: 'gte', right: _valueOrColumn(valueOrColumn), type: comparisonSymbol }
+  return {
+    operator: 'gte',
+    right: _valueOrColumn(valueOrColumn),
+    type: comparisonSymbol
+  }
 }
 
 // Greater than (JavaScript semantics)
 // Note:
 // - (5 > null) == true
 export function weakGt(valueOrColumn: NonNullValue | ColumnDescription): Comparison {
-  return { operator: 'weakGt', right: _valueOrColumn(valueOrColumn), type: comparisonSymbol }
+  return {
+    operator: 'weakGt',
+    right: _valueOrColumn(valueOrColumn),
+    type: comparisonSymbol
+  }
 }
 
 // Less than (SQLite semantics)
 // Note:
 // - (null < 5) == false
 export function lt(valueOrColumn: NonNullValue | ColumnDescription): Comparison {
-  return { operator: 'lt', right: _valueOrColumn(valueOrColumn), type: comparisonSymbol }
+  return {
+    operator: 'lt',
+    right: _valueOrColumn(valueOrColumn),
+    type: comparisonSymbol
+  }
 }
 
 // Less than or equal (SQLite semantics)
 // Note:
 // - (null <= 5) == false
 export function lte(valueOrColumn: NonNullValue | ColumnDescription): Comparison {
-  return { operator: 'lte', right: _valueOrColumn(valueOrColumn), type: comparisonSymbol }
+  return {
+    operator: 'lte',
+    right: _valueOrColumn(valueOrColumn),
+    type: comparisonSymbol
+  }
 }
 
 // Value in a set (SQLite IN semantics)
@@ -208,7 +278,13 @@ export function oneOf(values: NonNullValues): Comparison {
   invariant(Array.isArray(values), `argument passed to oneOf() is not an array`)
   Object.freeze(values) // even in production, because it's an easy mistake to make
 
-  return { operator: 'oneOf', right: { values }, type: comparisonSymbol }
+  return {
+    operator: 'oneOf',
+    right: {
+      values
+    },
+    type: comparisonSymbol
+  }
 }
 
 // Value not in a set (SQLite NOT IN semantics)
@@ -219,7 +295,13 @@ export function notIn(values: NonNullValues): Comparison {
   invariant(Array.isArray(values), `argument passed to notIn() is not an array`)
   Object.freeze(values) // even in production, because it's an easy mistake to make
 
-  return { operator: 'notIn', right: { values }, type: comparisonSymbol }
+  return {
+    operator: 'notIn',
+    right: {
+      values
+    },
+    type: comparisonSymbol
+  }
 }
 
 // Number is between two numbers (greater than or equal left, and less than or equal right)
@@ -229,17 +311,35 @@ export function between(left: number, right: number): Comparison {
     'Values passed to Q.between() are not numbers',
   )
   const values: number[] = [left, right]
-  return { operator: 'between', right: { values }, type: comparisonSymbol }
+  return {
+    operator: 'between',
+    right: {
+      values
+    },
+    type: comparisonSymbol
+  }
 }
 
 export function like(value: string): Comparison {
   invariant(typeof value === 'string', 'Value passed to Q.like() is not a string')
-  return { operator: 'like', right: { value }, type: comparisonSymbol }
+  return {
+    operator: 'like',
+    right: {
+      value
+    },
+    type: comparisonSymbol
+  }
 }
 
 export function notLike(value: string): Comparison {
   invariant(typeof value === 'string', 'Value passed to Q.notLike() is not a string')
-  return { operator: 'notLike', right: { value }, type: comparisonSymbol }
+  return {
+    operator: 'notLike',
+    right: {
+      value
+    },
+    type: comparisonSymbol
+  }
 }
 
 const nonLikeSafeRegexp = /[^a-zA-Z0-9]/g
@@ -249,14 +349,35 @@ export function sanitizeLikeString(value: string): string {
   return value.replace(nonLikeSafeRegexp, '_')
 }
 
+
 export function ftsMatch(value: string): Comparison {
   invariant(typeof value === 'string', 'Value passed to Q.ftsMatch() is not a string')
-  return { operator: 'ftsMatch', right: { value }, type: comparisonSymbol }
+  return {
+    operator: 'ftsMatch',
+    right: {
+      value
+    },
+    type: comparisonSymbol
+  }
+}
+
+export function includes(value: string): Comparison {
+  invariant(typeof value === 'string', 'Value passed to Q.includes() is not a string')
+  return {
+    operator: 'includes',
+    right: {
+      value
+    },
+    type: comparisonSymbol
+  }
 }
 
 export function column(name: ColumnName): ColumnDescription {
   invariant(typeof name === 'string', 'Name passed to Q.column() is not a string')
-  return { column: checkName(name), type: columnSymbol }
+  return {
+    column: checkName(name),
+    type: columnSymbol
+  }
 }
 
 function _valueOrComparison(arg: Value | Comparison): Comparison {
@@ -268,19 +389,32 @@ function _valueOrComparison(arg: Value | Comparison): Comparison {
     arg.type === comparisonSymbol,
     'Invalid Comparison passed to Query builder. You seem to be passing unsanitized user data to Query builder!',
   )
-  const { operator, right } = arg
-  return { operator, right }
+  const {
+    operator,
+    right
+  } = arg
+  return {
+    operator,
+    right
+  }
 }
 
 export function where(left: ColumnName, valueOrComparison: Value | Comparison): WhereDescription {
-  return { type: 'where', left: checkName(left), comparison: _valueOrComparison(valueOrComparison) }
+  return {
+    type: 'where',
+    left: checkName(left),
+    comparison: _valueOrComparison(valueOrComparison)
+  }
 }
 
 export function unsafeSqlExpr(sql: string): SqlExpr {
   if (process.env.NODE_ENV !== 'production') {
     invariant(typeof sql === 'string', 'Value passed to Q.unsafeSqlExpr is not a string')
   }
-  return { type: 'sql', expr: sql }
+  return {
+    type: 'sql',
+    expr: sql
+  }
 }
 
 export function unsafeLokiExpr(expr: any): LokiExpr {
@@ -290,11 +424,17 @@ export function unsafeLokiExpr(expr: any): LokiExpr {
       'Value passed to Q.unsafeLokiExpr is not an object',
     )
   }
-  return { type: 'loki', expr }
+  return {
+    type: 'loki',
+    expr
+  }
 }
 
 export function unsafeLokiTransform(fn: LokiTransformFunction): LokiTransform {
-  return { type: 'lokiTransform', function: fn }
+  return {
+    type: 'lokiTransform',
+    function: fn
+  }
 }
 
 const acceptableClauses = ['where', 'and', 'or', 'on', 'sql', 'loki']
@@ -310,12 +450,18 @@ const validateConditions = (clauses: Where[]) => {
 
 export function and(...clauses: Where[]): And {
   validateConditions(clauses)
-  return { type: 'and', conditions: clauses }
+  return {
+    type: 'and',
+    conditions: clauses
+  }
 }
 
 export function or(...clauses: Where[]): Or {
   validateConditions(clauses)
-  return { type: 'or', conditions: clauses }
+  return {
+    type: 'or',
+    conditions: clauses
+  }
 }
 
 export function sortBy(sortColumn: ColumnName, sortOrder: SortOrder = asc): SortBy {
@@ -323,25 +469,35 @@ export function sortBy(sortColumn: ColumnName, sortOrder: SortOrder = asc): Sort
     sortOrder === 'asc' || sortOrder === 'desc',
     `Invalid sortOrder argument received in Q.sortBy (valid: asc, desc)`,
   )
-  return { type: 'sortBy', sortColumn: checkName(sortColumn), sortOrder }
+  return {
+    type: 'sortBy',
+    sortColumn: checkName(sortColumn),
+    sortOrder
+  }
 }
 
 export function take(count: number): Take {
   invariant(typeof count === 'number', 'Value passed to Q.take() is not a number')
-  return { type: 'take', count }
+  return {
+    type: 'take',
+    count
+  }
 }
 
 export function skip(count: number): Skip {
   invariant(typeof count === 'number', 'Value passed to Q.skip() is not a number')
-  return { type: 'skip', count }
+  return {
+    type: 'skip',
+    count
+  }
 }
 
 // Note: we have to write out three separate meanings of OnFunction because of a Babel bug
 // (it will remove the parentheses, changing the meaning of the flow type)
-type _OnFunctionColumnValue = (TableName<any>, ColumnName, Value) => On
-type _OnFunctionColumnComparison = (TableName<any>, ColumnName, Comparison) => On
-type _OnFunctionWhere = (TableName<any>, Where) => On
-type _OnFunctionWhereList = (TableName<any>, Where[]) => On
+type _OnFunctionColumnValue = (TableName < any > , ColumnName, Value) => On
+type _OnFunctionColumnComparison = (TableName < any > , ColumnName, Comparison) => On
+type _OnFunctionWhere = (TableName < any > , Where) => On
+type _OnFunctionWhereList = (TableName < any > , Where[]) => On
 
 type OnFunction = _OnFunctionColumnValue &
   _OnFunctionColumnComparison &
@@ -376,13 +532,20 @@ export const on: OnFunction = (table, leftOrClauseOrList, valueOrComparison) => 
   return on(table, [clauseOrList])
 }
 
-export function experimentalJoinTables(tables: TableName<any>[]): JoinTables {
+export function experimentalJoinTables(tables: TableName < any > []): JoinTables {
   invariant(Array.isArray(tables), 'experimentalJoinTables expected an array')
-  return { type: 'joinTables', tables: tables.map(checkName) }
+  return {
+    type: 'joinTables',
+    tables: tables.map(checkName)
+  }
 }
 
-export function experimentalNestedJoin(from: TableName<any>, to: TableName<any>): NestedJoinTable {
-  return { type: 'nestedJoinTable', from: checkName(from), to: checkName(to) }
+export function experimentalNestedJoin(from: TableName < any > , to: TableName < any > ): NestedJoinTable {
+  return {
+    type: 'nestedJoinTable',
+    from: checkName(from),
+    to: checkName(to)
+  }
 }
 
 export function unsafeSqlQuery(sql: string, values: Value[] = []): SqlQuery {
@@ -393,14 +556,25 @@ export function unsafeSqlQuery(sql: string, values: Value[] = []): SqlQuery {
       'Placeholder values passed to Q.unsafeSqlQuery are not an array',
     )
   }
-  return { type: 'sqlQuery', sql, values }
+  return {
+    type: 'sqlQuery',
+    sql,
+    values
+  }
 }
 
 const syncStatusColumn = columnName('_status')
 const extractClauses: (Clause[]) => QueryDescription = (clauses) => {
-  const query = { where: [], joinTables: [], nestedJoinTables: [], sortBy: [] }
+  const query = {
+    where: [],
+    joinTables: [],
+    nestedJoinTables: [],
+    sortBy: []
+  }
   clauses.forEach((clause) => {
-    const { type } = clause
+    const {
+      type
+    } = clause
     switch (type) {
       case 'where':
       case 'and':
@@ -431,7 +605,10 @@ const extractClauses: (Clause[]) => QueryDescription = (clauses) => {
         break
       case 'nestedJoinTable':
         // $FlowFixMe
-        query.nestedJoinTables.push({ from: clause.from, to: clause.to })
+        query.nestedJoinTables.push({
+          from: clause.from,
+          to: clause.to
+        })
         break
       case 'lokiTransform':
         // $FlowFixMe
@@ -442,9 +619,7 @@ const extractClauses: (Clause[]) => QueryDescription = (clauses) => {
         query.sql = clause
         if (process.env.NODE_ENV !== 'production') {
           invariant(
-            clauses.every((_clause) =>
-              ['sqlQuery', 'joinTables', 'nestedJoinTable'].includes(_clause.type),
-            ),
+            clauses.every((_clause) => ['sqlQuery', 'joinTables', 'nestedJoinTable'].includes(_clause.type), ),
             'Cannot use Q.unsafeSqlQuery with other clauses, except for Q.experimentalJoinTables and Q.experimentalNestedJoin (Did you mean Q.unsafeSqlExpr?)',
           )
         }
@@ -495,9 +670,15 @@ function conditionsWithoutDeleted(conditions: Where[]): Where[] {
 
 function queryWithoutDeletedImpl(clause: Where): Where {
   if (clause.type === 'and') {
-    return { type: 'and', conditions: conditionsWithoutDeleted(clause.conditions) }
+    return {
+      type: 'and',
+      conditions: conditionsWithoutDeleted(clause.conditions)
+    }
   } else if (clause.type === 'or') {
-    return { type: 'or', conditions: conditionsWithoutDeleted(clause.conditions) }
+    return {
+      type: 'or',
+      conditions: conditionsWithoutDeleted(clause.conditions)
+    }
   } else if (clause.type === 'on') {
     const onClause: On = clause
     return {
@@ -511,7 +692,9 @@ function queryWithoutDeletedImpl(clause: Where): Where {
 }
 
 export function queryWithoutDeleted(query: QueryDescription): QueryDescription {
-  const { where: whereConditions } = query
+  const {
+    where: whereConditions
+  } = query
 
   const newQuery = {
     ...query,

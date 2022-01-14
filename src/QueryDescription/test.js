@@ -60,6 +60,7 @@ describe('buildQueryDescription', () => {
       Q.where('col9', Q.between(10, 11)),
       Q.where('col10', Q.like('%abc')),
       Q.where('col11', Q.notLike('def%')),
+      Q.where('col12', Q.includes('foo')),
     ])
     expect(query).toEqual({
       where: [
@@ -98,6 +99,11 @@ describe('buildQueryDescription', () => {
           type: 'where',
           left: 'col11',
           comparison: { operator: 'notLike', right: { value: 'def%' } },
+        },
+        {
+          type: 'where',
+          left: 'col12',
+          comparison: { operator: 'includes', right: { value: 'foo' } },
         },
       ],
       joinTables: [],
@@ -538,6 +544,7 @@ describe('buildQueryDescription', () => {
   })
   it('catches bad types', () => {
     expect(() => Q.eq({})).toThrow('Invalid value passed to query')
+    expect(() => Q.where('foo', undefined)).toThrow('undefined')
     // TODO: oneOf/notIn values?
     expect(() => Q.oneOf({})).toThrow('not an array')
     expect(() => Q.notIn({})).toThrow('not an array')
@@ -545,6 +552,7 @@ describe('buildQueryDescription', () => {
     expect(() => Q.like({})).toThrow('not a string')
     expect(() => Q.notLike(null)).toThrow('not a string')
     expect(() => Q.notLike({})).toThrow('not a string')
+    expect(() => Q.includes(null)).toThrow('not a string')
     expect(() => Q.sanitizeLikeString(null)).toThrow('not a string')
     expect(() => Q.ftsMatch(null)).toThrow('not a string')
     expect(() => Q.column({})).toThrow('not a string')
