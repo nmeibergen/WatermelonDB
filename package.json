@@ -24,7 +24,7 @@
     "docs:dev": "./scripts/mdbook-dev",
     "prepare": "npm run build"
   },
-  "main": "dist/index.js",
+  "main": "./dist/index.js",
   "author": "@Nozbe",
   "homepage": "https://github.com/Nozbe/WatermelonDB#readme",
   "bugs": "https://github.com/Nozbe/WatermelonDB/issues",
@@ -40,6 +40,9 @@
     "reactive",
     "persistence"
   ],
+  "exports": {
+    ".": "./dist"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/Nozbe/WatermelonDB.git"
