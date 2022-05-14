@@ -21,10 +21,8 @@
     "ktlint:format": "cd native/androidTest; ./gradlew ktlintFormat",
     "android:emulator": "./scripts/emulatorWithJavaCheck",
     "docs": "./scripts/mdbook",
-    "docs:dev": "./scripts/mdbook-dev",
-    "prepare": "npm run build"
+    "docs:dev": "./scripts/mdbook-dev"
   },
-  "main": "./dist/index.js",
   "author": "@Nozbe",
   "homepage": "https://github.com/Nozbe/WatermelonDB#readme",
   "bugs": "https://github.com/Nozbe/WatermelonDB/issues",
@@ -40,9 +38,6 @@
     "reactive",
     "persistence"
   ],
-  "exports": {
-    ".": "./dist"
-  },
   "repository": {
     "type": "git",
     "url": "https://github.com/Nozbe/WatermelonDB.git"
