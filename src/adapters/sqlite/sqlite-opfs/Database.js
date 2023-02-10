@@ -1,6 +1,6 @@
 // @flow
 const fs = require(`fs`)
-const SQliteDatabase = require('better-sqlite3')
+const SQliteDatabase = null; // require('better-sqlite3')
 
 type SQLiteDatabaseType = any
 
