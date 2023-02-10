@@ -1,8 +1,7 @@
 // @flow
 /* eslint-disable global-require */
 
-import SqliteNodeDispatcher from '../sqlite-node/dispatcher'
-import SqliteOPFSDispatcher from '../sqlite-opfs/dispatcher'
+// import SqliteOPFSDispatcher from '../sqlite-opfs/dispatcher'
 
 import { type ConnectionTag } from '../../../utils/common'
 import { type ResultCallback } from '../../../utils/fp/Result'
@@ -23,9 +22,11 @@ export const makeDispatcher = (
 
   if (typeof window === 'undefined') {
     // running in NodeJS
-    return new SqliteNodeDispatcher(tag)
+    const SqliteNodeDispatcher = require("../sqlite-node/dispatcher.js").default;
+    return new SqliteNodeDispatcher(tag) 
   } else {
-    // running in OPFS
+    // running in browser
+    const SqliteOPFSDispatcher = require("../sqlite-opfs/dispatcher.js").default;
     return new SqliteOPFSDispatcher(tag)
   }
 }
