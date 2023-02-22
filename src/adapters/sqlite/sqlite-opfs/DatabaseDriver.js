@@ -2,6 +2,8 @@
 
 import Database from './Database'
 
+const BASE_WM_PATH = "watermelon/"
+
 function fixArgs(args: any[]): any[] {
   return args.map((value) => {
     if (typeof value === 'boolean') {
@@ -36,25 +38,6 @@ class SchemaNeededError extends Error {
   }
 }
 
-export function getPath(dbName: string): string {
-  if (dbName === ':memory:' || dbName === 'file::memory:') {
-    return dbName
-  }
-
-  let path =
-    dbName.startsWith('/') || dbName.startsWith('file:') ? dbName : `${process.cwd()}/${dbName}`
-  if (path.indexOf('.db') === -1) {
-    if (path.indexOf('?') >= 0) {
-      const index = path.indexOf('?')
-      path = `${path.substring(0, index)}.db${path.substring(index)}`
-    } else {
-      path = `${path}.db`
-    }
-  }
-
-  return path
-}
-
 class DatabaseDriver {
   static sharedMemoryConnections: { [dbName: string]: Database } = {}
 
@@ -62,15 +45,15 @@ class DatabaseDriver {
 
   cachedRecords: any = {}
 
-  initialize(dbName: string, schemaVersion: number): void {
-    this.init(dbName)
-    this.isCompatible(schemaVersion)
+  async initialize(dbName: string, schemaVersion: number): Promise<void> {
+    await this.init(dbName)
+    await this.isCompatible(schemaVersion)
   }
 
-  setUpWithSchema(dbName: string, schema: string, schemaVersion: number): void {
-    this.init(dbName)
-    this.unsafeResetDatabase({ version: schemaVersion, sql: schema })
-    this.isCompatible(schemaVersion)
+  async setUpWithSchema(dbName: string, schema: string, schemaVersion: number): Promise<void> {
+    await this.init(dbName)
+    await this.unsafeResetDatabase({ version: schemaVersion, sql: schema })
+    await this.isCompatible(schemaVersion)
   }
 
   setUpWithMigrations(dbName: string, migrations: Migrations): void {
@@ -79,15 +62,22 @@ class DatabaseDriver {
     this.isCompatible(migrations.to)
   }
 
-  init(dbName: string): void {
-    this.database = new Database(getPath(dbName))
-
-    const isSharedMemory = dbName.indexOf('mode=memory') > 0 && dbName.indexOf('cache=shared') > 0
-    if (isSharedMemory) {
-      if (!DatabaseDriver.sharedMemoryConnections[dbName]) {
-        DatabaseDriver.sharedMemoryConnections[dbName] = this.database
+  async init(dbName: string): Promise<void> {
+    /**
+     * @note
+     * Checking if a database is already defined is not done for the sqlite-node adapater.. hmmm
+     */
+    if(!this.database){
+      this.database = await Database.init(BASE_WM_PATH + dbName)
+      // this.database = new Database(getPath(dbName))
+  
+      const isSharedMemory = dbName.indexOf('mode=memory') > 0 && dbName.indexOf('cache=shared') > 0
+      if (isSharedMemory) {
+        if (!DatabaseDriver.sharedMemoryConnections[dbName]) {
+          DatabaseDriver.sharedMemoryConnections[dbName] = this.database
+        }
+        this.database = DatabaseDriver.sharedMemoryConnections[dbName]
       }
-      this.database = DatabaseDriver.sharedMemoryConnections[dbName]
     }
   }
 
@@ -131,23 +121,24 @@ class DatabaseDriver {
     return this.database.count(query, fixArgs(args))
   }
 
-  batch(operations: any[]): void {
-    const newIds = []
-    const removedIds = []
+  async batch(operations: any[]): Promise<void> {
+    // const newIds = []
+    // const removedIds = []
 
-    this.database.inTransaction(() => {
-      operations.forEach((operation: any[]) => {
-        const [cacheBehavior, table, sql, argBatches] = operation
-        argBatches.forEach((args) => {
-          this.database.execute(sql, fixArgs(args))
-          if (cacheBehavior === 1) {
-            newIds.push([table, args[0]])
-          } else if (cacheBehavior === -1) {
-            removedIds.push([table, args[0]])
-          }
-        })
-      })
-    })
+    // this.database.inTransaction(() => {
+    //   operations.forEach((operation: any[]) => {
+    //     const [cacheBehavior, table, sql, argBatches] = operation
+    //     argBatches.forEach((args) => {
+    //       this.database.execute(sql, fixArgs(args))
+    //       if (cacheBehavior === 1) {
+    //         newIds.push([table, args[0]])
+    //       } else if (cacheBehavior === -1) {
+    //         removedIds.push([table, args[0]])
+    //       }
+    //     })
+    //   })
+    // })
+    const [newIds, removedIds] = await this.database.batch(operations)
 
     newIds.forEach(([table, id]) => {
       this.markAsCached(table, id)
@@ -201,8 +192,8 @@ class DatabaseDriver {
 
   // MARK: - Other private details
 
-  isCompatible(schemaVersion: number): void {
-    const databaseVersion = this.database.userVersion
+  async isCompatible(schemaVersion: number): Promise<void> {
+    const databaseVersion = await this.database.userVersion
     if (schemaVersion !== databaseVersion) {
       if (databaseVersion > 0 && databaseVersion < schemaVersion) {
         throw new MigrationNeededError(databaseVersion)
@@ -212,18 +203,15 @@ class DatabaseDriver {
     }
   }
 
-  unsafeResetDatabase(schema: { sql: string, version: number }): void {
-    this.database.unsafeDestroyEverything()
+  async unsafeResetDatabase(schema: { sql: string, version: number }): Promise<void> {
+    await this.database.unsafeDestroyEverything()
     this.cachedRecords = {}
 
-    this.database.inTransaction(() => {
-      this.database.executeStatements(schema.sql)
-      this.database.userVersion = schema.version
-    })
+    await this.database.executeAndSetUserVersion(schema.sql, schema.version)
   }
 
-  migrate(migrations: Migrations): void {
-    const databaseVersion = this.database.userVersion
+  async migrate(migrations: Migrations): Promise<void> {
+    const databaseVersion = await this.database.userVersion
 
     if (`${databaseVersion}` !== `${migrations.from}`) {
       throw new Error(
@@ -231,10 +219,7 @@ class DatabaseDriver {
       )
     }
 
-    this.database.inTransaction(() => {
-      this.database.executeStatements(migrations.sql)
-      this.database.userVersion = migrations.to
-    })
+    await this.database.executeAndSetUserVersion(migrations.sql, migrations.to)
   }
 }
 

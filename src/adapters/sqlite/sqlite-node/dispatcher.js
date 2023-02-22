@@ -5,11 +5,8 @@ import DatabaseBridge from './DatabaseBridge'
 import { type ConnectionTag } from '../../../utils/common'
 import { type ResultCallback } from '../../../utils/fp/Result'
 import type {
-  DispatcherType,
-  SQLiteAdapterOptions,
   SqliteDispatcher,
   SqliteDispatcherMethod,
-  SqliteDispatcherOptions,
 } from '../type'
 
 export default class SqliteNodeDispatcher implements SqliteDispatcher {
