@@ -4,15 +4,13 @@ import DatabaseDriver from './DatabaseDriver'
 
 
 class DatabaseBridge {
-  connections: { [key: number]: Connection } = {}
-
   _driver: DatabaseDriver
   queue: any[] = []
   status: string
 
-  get driver(){
+  get driver(): DatabaseDriver{
     if(!this._driver){
-      this._driver = new DatabaseDriver();
+      this._driver = new DatabaseDriver()
     }
     return this._driver
   }
@@ -34,7 +32,7 @@ class DatabaseBridge {
     schemaVersion: number,
     resolve: (status: { code: string, databaseVersion?: number }) => void,
     reject: () => void,
-  ): void {
+  ): Promise<void> {
     try {
       this.waiting()
       await this.driver.initialize(databaseName, schemaVersion)

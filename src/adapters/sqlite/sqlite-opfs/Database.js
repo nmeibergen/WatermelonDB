@@ -25,8 +25,8 @@ class Database {
   }
 
   async open(): Promise <void> {
-    let {
-      path
+    const {
+      path,
     } = this
 
     try {
@@ -54,7 +54,7 @@ class Database {
   /**
    * Transaction specific methods
    */
-  async executeAndSetUserVersion(sql, version): Promise<void> {
+  async executeAndSetUserVersion(sql: string, version: number): Promise<void> {
     return this.instance.transaction((db, args) => {
       db.exec(args.sql)
       db.pragma(`user_version = ${args.version}`)
@@ -64,7 +64,7 @@ class Database {
     })
   }
 
-  async batch(operations): Promise<[number[], number[]]> {
+  async batch(operations: any[]): Promise<[[string, string][], [string, string][]]> {
 
     const result = await this.instance.transaction((db) => {
       const newIds = []
@@ -89,8 +89,7 @@ class Database {
 
   async execute(query: string, args: any[] = []): Promise<any> {
     const stmt = await this.instance.prepare(query)
-    await stmt.bind(args)
-    return stmt.all()
+    return stmt.all(args)
 
     // return await this.instance.prepare(query).run(args)
   }
@@ -101,13 +100,13 @@ class Database {
 
   async queryRaw(query: string, args: any[] = []): Promise<any | any[]> {
     const stmt = await this.instance.prepare(query)
-    await stmt.bind(args)
-    return stmt.all() || []
+    const res = await stmt.all(args)
+    return res || []
   }
 
   async count(query: string, args: any[] = []): Promise<number> {
     const stmt = await this.instance.prepare(query)
-    const results = await stmt.all()
+    const results = await stmt.all(args)
 
     if (results.length === 0) {
       throw new Error('Invalid count query, can`t find next() on the result')
@@ -123,11 +122,7 @@ class Database {
   }
 
   get userVersion(): Promise<number> {
-    return new Promise(resolve => {
-      this.instance.pragma('user_version').then(res => {
-        resolve(res)
-      })
-    })
+    return this.instance.pragma('user_version')
   }
 
   async setUserVersion(version: number): Promise<void> {

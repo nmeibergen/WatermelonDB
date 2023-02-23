@@ -4,15 +4,6 @@ import Database from './Database'
 
 const BASE_WM_PATH = "watermelon/"
 
-function fixArgs(args: any[]): any[] {
-  return args.map((value) => {
-    if (typeof value === 'boolean') {
-      return value ? 1 : 0
-    }
-    return value
-  })
-}
-
 type Migrations = { from: number, to: number, sql: string }
 
 class MigrationNeededError extends Error {
@@ -81,13 +72,13 @@ class DatabaseDriver {
     }
   }
 
-  find(table: string, id: string): any | null | string {
+  async find(table: string, id: string): Promise<any | null | string> {
     if (this.isCached(table, id)) {
       return id
     }
 
     const query = `SELECT * FROM '${table}' WHERE id == ? LIMIT 1`
-    const results = this.database.queryRaw(query, [id])
+    const results = await this.database.queryRaw(query, [id])
 
     if (results.length === 0) {
       return null
@@ -97,8 +88,8 @@ class DatabaseDriver {
     return results[0]
   }
 
-  cachedQuery(table: string, query: string, args: any[]): any[] {
-    const results = this.database.queryRaw(query, fixArgs(args))
+  async cachedQuery(table: string, query: string, args: any[]): Promise<any[]> {
+    const results = await this.database.queryRaw(query, args)
     return results.map((row: any) => {
       const id = `${row.id}`
       if (this.isCached(table, id)) {
@@ -109,35 +100,21 @@ class DatabaseDriver {
     })
   }
 
-  queryIds(query: string, args: any[]): string[] {
-    return this.database.queryRaw(query, fixArgs(args)).map((row) => `${row.id}`)
+  async queryIds(query: string, args: any[]): Promise<string[]> {
+    const raw = await this.database.queryRaw(query, args)
+    return raw.map((row) => `${row.id}`)
   }
 
-  unsafeQueryRaw(query: string, args: any[]): any[] {
-    return this.database.queryRaw(query, fixArgs(args))
+  async unsafeQueryRaw(query: string, args: any[]): Promise<any[]> {
+    return this.database.queryRaw(query, args)
   }
 
-  count(query: string, args: any[]): number {
-    return this.database.count(query, fixArgs(args))
+  async count(query: string, args: any[]): Promise<number> {
+    return this.database.count(query, args)
   }
 
   async batch(operations: any[]): Promise<void> {
-    // const newIds = []
-    // const removedIds = []
 
-    // this.database.inTransaction(() => {
-    //   operations.forEach((operation: any[]) => {
-    //     const [cacheBehavior, table, sql, argBatches] = operation
-    //     argBatches.forEach((args) => {
-    //       this.database.execute(sql, fixArgs(args))
-    //       if (cacheBehavior === 1) {
-    //         newIds.push([table, args[0]])
-    //       } else if (cacheBehavior === -1) {
-    //         removedIds.push([table, args[0]])
-    //       }
-    //     })
-    //   })
-    // })
     const [newIds, removedIds] = await this.database.batch(operations)
 
     newIds.forEach(([table, id]) => {
@@ -151,8 +128,8 @@ class DatabaseDriver {
 
   // MARK: - LocalStorage
 
-  getLocal(key: string): any | null {
-    const results = this.database.queryRaw('SELECT `value` FROM `local_storage` WHERE `key` = ?', [
+  async getLocal(key: string): Promise<any | null> {
+    const results = await this.database.queryRaw('SELECT `value` FROM `local_storage` WHERE `key` = ?', [
       key,
     ])
 

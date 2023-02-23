@@ -2,14 +2,10 @@
 /* eslint-disable global-require */
 
 import DatabaseBridge from './DatabaseBridge'
-import { type ConnectionTag } from '../../../utils/common'
 import { type ResultCallback } from '../../../utils/fp/Result'
 import type {
-  DispatcherType,
-  SQLiteAdapterOptions,
   SqliteDispatcher,
   SqliteDispatcherMethod,
-  SqliteDispatcherOptions,
 } from '../type'
 
 
@@ -25,7 +21,6 @@ export default class SqliteOPFSDispatcher implements SqliteDispatcher {
    */
   call(methodName: SqliteDispatcherMethod, args: any[], callback: ResultCallback<any>): void {
     // $FlowFixMe
-    console.log(`call ${methodName}`)
 
     /**
      * Wonderful, because of this callback approach to the database bridge we can make
