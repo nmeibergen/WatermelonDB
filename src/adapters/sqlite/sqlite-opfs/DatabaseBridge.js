@@ -162,15 +162,15 @@ class DatabaseBridge {
 
   // MARK: - Helpers
 
-  withDriver(
+  async withDriver(
     resolve: (any) => void,
     reject: (any) => void,
     functionName: string,
     action: (driver: DatabaseDriver) => any,
-  ): void {
+  ): Promise<void> {
     try {
       if (this.status === 'connected') {
-        const result = action(this.driver)
+        const result = await action(this.driver)
         resolve(result)
       } else if (this.status === 'waiting') {
         this.queue.push(() => {

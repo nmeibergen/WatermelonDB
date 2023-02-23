@@ -33,18 +33,6 @@ class Database {
     }
   }
 
-  inTransaction(executeBlock: () => void): void {
-    this.instance.transaction(executeBlock)()
-  }
-
-  execute(query: string, args: any[] = []): any {
-    return this.instance.prepare(query).run(args)
-  }
-
-  executeStatements(queries: string): any {
-    return this.instance.exec(queries)
-  }
-
   queryRaw(query: string, args: any[] = []): any | any[] {
     let results = []
     const stmt = this.instance.prepare(query)

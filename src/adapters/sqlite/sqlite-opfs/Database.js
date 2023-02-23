@@ -14,6 +14,13 @@ class Database {
 
     // initializes the 'environment', the worker...
     database.sqlite3 = await bareSqliteOPFS()
+
+    /**
+     * hacky to clear the db 
+     * uncomment below
+     */
+    // await database.sqlite3.clear()
+
     await database.open() 
 
     return database
@@ -66,13 +73,14 @@ class Database {
 
   async batch(operations: any[]): Promise<[[string, string][], [string, string][]]> {
 
-    const result = await this.instance.transaction((db) => {
+    const result = await this.instance.transaction((db, { operations }) => {
       const newIds = []
       const removedIds = []
       operations.forEach((operation: any[]) => {
         const [cacheBehavior, table, sql, argBatches] = operation
         argBatches.forEach((args) => {
-          db.exec(sql)
+          const stmt = db.prepare(sql)
+          stmt.run(args)
           if (cacheBehavior === 1) {
             newIds.push([table, args[0]])
           } else if (cacheBehavior === -1) {
@@ -84,12 +92,14 @@ class Database {
       return [newIds, removedIds]
     }, {operations})
 
+    console.debug("result")
+    console.debug(result)
     return result
   }
 
   async execute(query: string, args: any[] = []): Promise<any> {
     const stmt = await this.instance.prepare(query)
-    return stmt.all(args)
+    return stmt.all(...args)
 
     // return await this.instance.prepare(query).run(args)
   }
@@ -100,13 +110,13 @@ class Database {
 
   async queryRaw(query: string, args: any[] = []): Promise<any | any[]> {
     const stmt = await this.instance.prepare(query)
-    const res = await stmt.all(args)
+    const res = await stmt.all(...args)
     return res || []
   }
 
   async count(query: string, args: any[] = []): Promise<number> {
     const stmt = await this.instance.prepare(query)
-    const results = await stmt.all(args)
+    const results = await stmt.all(...args)
 
     if (results.length === 0) {
       throw new Error('Invalid count query, can`t find next() on the result')

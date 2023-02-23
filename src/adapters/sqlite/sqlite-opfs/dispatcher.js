@@ -29,7 +29,11 @@ export default class SqliteOPFSDispatcher implements SqliteDispatcher {
     const method = DatabaseBridge[methodName].bind(DatabaseBridge)
     method(
       ...args,
-      (value) => callback({ value }),
+      (value) => {
+        console.debug(`Called ${methodName}, has result value:`)
+        console.debug({value})
+        callback({ value })
+      },
       (code, message, error) => callback({ error }),
     )
   }

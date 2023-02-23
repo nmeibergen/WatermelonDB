@@ -61,7 +61,6 @@ class DatabaseDriver {
     if(!this.database){
       this.database = await Database.init(BASE_WM_PATH + dbName)
       // this.database = new Database(getPath(dbName))
-  
       const isSharedMemory = dbName.indexOf('mode=memory') > 0 && dbName.indexOf('cache=shared') > 0
       if (isSharedMemory) {
         if (!DatabaseDriver.sharedMemoryConnections[dbName]) {
